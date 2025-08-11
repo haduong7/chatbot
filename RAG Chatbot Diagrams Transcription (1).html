@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Enterprise RAG Chatbot</title>
+  <style>
+    :root {
+      --fg: #0f172a; /* slate-900 */
+      --muted: #475569; /* slate-600 */
+      --accent: #0ea5e9; /* sky-500 */
+      --bg: #ffffff;
+      --card: #f8fafc; /* slate-50 */
+      --border: #e2e8f0; /* slate-200 */
+    }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; line-height:1.6 }
+    .container { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px }
+    h1 { font-size: 34px; line-height:1.15; margin: 0 0 8px }
+    h2 { font-size: 26px; margin: 32px 0 12px }
+    h3 { font-size: 20px; margin: 24px 0 8px }
+    p { margin: 8px 0 }
+    .lead { font-size: 16px; color: var(--muted) }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; margin: 14px 0 }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px }
+    .muted { color: var(--muted) }
+    .hr { height:1px; background: var(--border); margin: 28px 0 }
+    .figure { background: var(--card); border:1px solid var(--border); border-radius: 16px; padding: 10px; margin: 14px 0 }
+    .figure img { display:block; width:100%; height:auto }
+    .caption { font-size: 13px; color: var(--muted); margin-top: 6px; display:flex; justify-content: space-between; align-items:center }
+    .caption a { text-decoration: none; color: var(--accent) }
+    ul { padding-left: 18px }
+    .toc { font-size: 14px; background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin: 10px 0 22px }
+    .toc a { color: var(--accent); text-decoration:none }
+    .tag { display:inline-block; padding: 2px 8px; border:1px solid var(--border); border-radius: 999px; font-size: 12px; margin-right: 8px; color: var(--muted) }
+    code { background:#f1f5f9; padding:2px 6px; border-radius:6px }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1 id="top">RAG Chatbot</h1>
+      <p class="lead">AI cho doanh nghiệp, trả lời dựa trên <strong>data</strong> nội bộ với trích dẫn và phân quyền.</p>
+      <nav class="toc">
+        <strong>Mục lục</strong>
+        <ul>
+          <li><a href="#intro">Vấn đề & Giải pháp</a></li>
+          <li><a href="#costs">Chi phí ước tính</a></li>
+          <li><a href="#arch">Kiến trúc (Architecture)</a></li>
+          <li><a href="#embedding">Embedding</a></li>
+          <li><a href="#context">Context Engineering</a></li>
+          <li><a href="#safety">An toàn &amp; Phân quyền</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <section id="intro">
+      <div class="card">
+        <p><strong>Vấn đề với AI trong doanh nghiệp:</strong> AI thường được huấn luyện trên lượng <em>data</em> rất lớn nên “biết nhiều”, nhưng <strong>không</strong> biết <em>data</em> nội bộ, bối cảnh và quy trình riêng của công ty bạn. Việc mang toàn bộ <em>data</em> vào để huấn luyện lại liên tục là khó khả thi vì <em>data</em> thay đổi thường xuyên; quá trình này tốn thời gian và chi phí.</p>
+        <p><strong>Giải pháp — RAG:</strong> Thay vì “dạy” lại hệ thống, RAG cho phép AI <strong>tìm kiếm theo thời gian thực</strong> trong <em>data</em> của bạn và <strong>dựa vào</strong> đúng tài liệu nguồn để soạn câu trả lời có trích dẫn, đồng thời vẫn tôn trọng phân quyền.</p>
+      </div>
+
+      <h2>Hệ thống RAG làm gì</h2>
+      <ul>
+        <li>Tìm kiếm <em>tài liệu và hệ thống của công ty</em> để lấy phần liên quan nhất.</li>
+        <li>Soạn câu trả lời rõ ràng và hiển thị nguồn gốc (trích dẫn/liên kết).</li>
+        <li>Tôn trọng quyền truy cập — mỗi người chỉ thấy những gì họ được phép.</li>
+        <li><strong>Không</strong> “học” bí mật của bạn; hệ thống chỉ tra cứu khi được hỏi.</li>
+      </ul>
+
+      <figure class="figure">
+    <img src="1.svg" alt="Sơ đồ RAG (dành cho chủ DN)" />
+    <figcaption class="caption">
+      <span>Sơ đồ RAG (dành cho chủ DN)</span>
+    </figcaption>
+  </figure>
+    </section>
+
+    <div class="hr"></div>
+
+    <section id="costs">
+      <h2>Chi phí ước tính</h2>
+      <p class="muted">Giả định <strong>tự host</strong> phần lớn hệ thống (Qdrant, backend, ingest) trên <strong>VMs</strong>; LLM có thể dùng <strong>API theo tokens</strong> hoặc tự host (GPU VM – không gộp trong số dưới). Tỷ giá tham chiếu: ~1 USD ≈ 25.000 VND (để làm tròn).</p>
+
+      <h3>Giả định chung</h3>
+      <ul>
+        <li>Người dùng hoạt động (MAU): <strong>50</strong> và <strong>200–500</strong>.</li>
+        <li>Mỗi người <strong>5–8 câu/ngày</strong>.</li>
+        <li>Mỗi câu ~<strong>6k–10k tokens</strong> (retrieval + tổng hợp).</li>
+        <li>Đơn giá LLM API: ~<strong>50.000–250.000 VND / 1M tokens</strong>.</li>
+      </ul>
+
+      <h3>Thành phần chi phí (tự host)</h3>
+      <ul>
+        <li><strong>LLM (API theo tokens)</strong>: Tổng tokens/tháng × (giá VND/1M tokens).</li>
+        <li><strong>Qdrant (Vector DB) – VM nhỏ</strong>: ~<strong>600.000 – 2.000.000 VND/tháng</strong>.</li>
+        <li><strong>Backend FastAPI + Orchestrator – VM</strong>: ~<strong>500.000 – 2.500.000 VND/tháng</strong>.</li>
+        <li><strong>Embedding & ingest</strong>: ~<strong>500.000 – 5.000.000 VND/tháng</strong>.</li>
+        <li><strong>Lưu trữ tài liệu & chỉ mục</strong>: ~<strong>50.000 – 300.000 VND/tháng</strong>.</li>
+        <li><strong>Quan sát/nhật ký</strong>: ~<strong>0 – 2.500.000 VND/tháng</strong>.</li>
+        <li><strong>Dự phòng</strong> 10–20% cho biến động tải.</li>
+      </ul>
+
+      <h3>Kịch bản chi phí mẫu (VND, làm tròn)</h3>
+      <div class="grid">
+        <div class="card">
+          <h4>Pilot (≤50 người dùng)</h4>
+          <ul>
+            <li>Lưu lượng: ≈ <strong>45M tokens/tháng</strong>.</li>
+            <li><strong>LLM API</strong>: ~<strong>2,5 – 11,5 triệu VND/tháng</strong>.</li>
+            <li><strong>Hạ tầng khác</strong> (VMs, storage, logs, ingest): ~<strong>2 – 6 triệu VND/tháng</strong>.</li>
+            <li><strong>Tổng</strong>: <strong>~5 – 18 triệu VND/tháng</strong>.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Nhóm/BU (200–500 người dùng)</h4>
+          <ul>
+            <li>Lưu lượng: ≈ <strong>384M tokens/tháng</strong>.</li>
+            <li><strong>LLM API</strong>: ~<strong>20 – 96 triệu VND/tháng</strong>.</li>
+            <li><strong>Hạ tầng khác</strong> (VMs tăng cỡ, ingest định kỳ): ~<strong>5 – 15 triệu VND/tháng</strong>.</li>
+            <li><strong>Tổng</strong>: <strong>~25 – 110 triệu VND/tháng</strong>.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="muted"><strong>Gợi ý tiết kiệm:</strong> caching, reranking, giới hạn context (prompt budgeting), dùng SLM cho bước chọn công cụ, chỉ gọi Large LLM khi cần; batch embedding theo lịch, chỉ re-embed phần thay đổi.</p>
+    </section>
+
+    <div class="hr"></div>
+
+    <section id="arch">
+      <h2>Kiến trúc (Architecture)</h2>
+
+      <h3>Ví dụ: LlamaIndex Orchestrator</h3>
+      <figure class="figure">
+    <img src="2.svg" alt="LlamaIndex Orchestrator" />
+    <figcaption class="caption">
+      <span>LlamaIndex Orchestrator</span>
+    </figcaption>
+  </figure>
+
+      <div class="card">
+        <ol>
+          <li>Router (LLM) quyết định gọi công cụ nào.</li>
+          <li>Với câu hỏi dạng SQL, SLM sinh <code>text-to-SQL</code> và truy cập <strong>CSDL quan hệ</strong>.</li>
+          <li>Với câu hỏi kiến thức, <strong>retriever</strong> lấy <strong>top‑k docs</strong> từ <strong>Vector DB</strong>.</li>
+          <li><strong>Large LLM</strong> tổng hợp câu trả lời cuối cùng kèm trích dẫn.</li>
+        </ol>
+      </div>
+
+      <h3>Kiến trúc tổng quan (High‑Level Architecture)</h3>
+      <figure class="figure">
+    <img src="3.svg" alt="Kiến trúc tổng quan" />
+    <figcaption class="caption">
+      <span>Kiến trúc tổng quan</span>
+    </figcaption>
+  </figure>
+
+      <div class="card">
+        <ul>
+          <li><strong>Qdrant (Vector DB)</strong> thân thiện với Python/FASTAPI.</li>
+          <li>Nạp <strong>metadata</strong> (loại tài liệu, đơn vị, chủ sở hữu, ngôn ngữ, nhãn quyền hạn).</li>
+          <li>Dùng metadata để <strong>giới hạn phạm vi</strong> truy xuất và kiểm soát truy cập.</li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="hr"></div>
+
+    <section id="embedding">
+      <h2>Embedding</h2>
+<p><strong>Tóm tắt ngắn:</strong> Embedding biến văn bản/tài liệu thành <strong>vector số</strong> để đo <strong>độ tương tự</strong>. Câu hỏi cũng được nhúng và dùng để tìm <strong>hàng xóm gần nhất</strong> trong Vector DB, lấy đúng đoạn liên quan cho LLM.</p>
+      <ul>
+        <li><strong>multilingual‑E5‑base (~280M)</strong> – chạy ổn ~4–8 vCPU, 16GB RAM; có thể <em>quantized</em> (giảm chất lượng ~1–3%).</li>
+        <li><strong>BGE‑m3 (~560M)</strong>.</li>
+        <li>Bắt đầu với một model; đánh giá trên <strong>enterprise data</strong> đa ngôn ngữ.</li>
+        <li>Lưu vector trong <strong>Qdrant</strong>; đính kèm metadata để phục vụ phân quyền & định tuyến.</li>
+      </ul>
+    </section>
+
+    <div class="hr"></div>
+
+    <section id="context">
+      <h2>Context Engineering</h2>
+<p><strong>Tóm tắt ngắn:</strong> Context engineering là cách <strong>định hướng LLM bằng ngữ cảnh</strong> ngoài model: system prompt gọn, mô tả tools, định dạng trả lời, và rào chắn để không vượt quyền. Luật dài nên đặt trong <strong>code</strong>, không nhồi vào prompt.</p>
+      <p><strong>Nội dung system prompt</strong> (giữ ngắn, ≤ ~250 tokens):</p>
+      <ul>
+        <li><strong>Persona & Role</strong></li>
+        <li>Quy tắc & giới hạn</li>
+        <li>Định dạng đầu ra</li>
+        <li>Thông tin về công cụ khả dụng</li>
+        <li>Hướng dẫn ngôn ngữ</li>
+        <li><strong>Enforce refusals</strong></li>
+      </ul>
+      <p class="muted">Gợi ý: giữ system prompt gọn; quy tắc dài nên đưa vào code và rào chắn.</p>
+    </section>
+
+    <div class="hr"></div>
+
+    <section id="safety">
+      <h2>An toàn &amp; Phân quyền</h2>
+
+      <h3>Trước LLM (Pre‑Model)</h3>
+      <ul>
+        <li><strong>Rebuff</strong>: chặn prompts độc hại/jailbreak trước khi tới LLM.</li>
+        <li>Nguyên tắc <strong>ít đặc quyền nhất</strong>: mỗi người dùng có <strong>mức quyền</strong>; truyền kèm vào mọi truy vấn bằng code (không đưa trong prompt).</li>
+      </ul>
+
+      <h3>Khi chạy (Runtime Guardrails)</h3>
+      <ul>
+        <li>Áp dụng <strong>mẫu phản hồi</strong>: bắt buộc trích dẫn; các trường có cấu trúc (câu trả lời, nguồn, <strong>độ tin cậy</strong>).</li>
+        <li>Không trả lời nếu <strong>độ tin cậy &lt; 70%</strong>; yêu cầu làm rõ hoặc trả về phương án an toàn.</li>
+      </ul>
+
+      <h3>Nơi áp dụng phân quyền</h3>
+      <ul>
+        <li><strong>Vector DB (Qdrant)</strong>: lọc theo metadata (ví dụ: <code>company</code>, <code>BU</code>, <code>doc_owner</code>, <code>perm_level</code>).</li>
+        <li><strong>SQL</strong>: thêm ràng buộc quyền vào truy vấn sinh ra.</li>
+        <li><strong>LLM wrapper</strong>: mọi lời gọi LlamaIndex đều được bọc kiểm tra vai trò trước khi chạy tool.</li>
+      </ul>
+    </section>
+
+    <footer class="hr"></footer>
+    <p class="muted">Tài liệu này tóm tắt kế hoạch RAG chatbot cho truy xuất <strong>enterprise data</strong> và trả lời an toàn.</p>
+    <p><a href="#top">↑ Lên đầu trang</a></p>
+  </div>
+</body>
+</html>
